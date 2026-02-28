@@ -104,7 +104,7 @@ export default function Dashboard() {
 
               <button
                 onClick={() =>
-                  router.push(`/dashboard/${campaign._id}`)
+                  router.push(`/dashboard/campaign/${campaign._id}`)
                 }
                 className="mt-5 text-blue-600 text-sm font-medium"
               >
