@@ -70,7 +70,7 @@ export default function SignUp() {
         setSuccessMessage("Account created successfully");
 
         setTimeout(() => {
-          router.push("/interview");
+          router.push("/dashboard");
         }, 1000);
       } else {
         setErrorMessage(result.message || "Signup failed");
