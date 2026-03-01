@@ -4,18 +4,22 @@ import { useEffect, useRef, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 
 interface HR {
+  _id?: string;
   name: string;
   email: string;
   company?: string;
-  status?: "sent" | "not_sent";
+  status?: "sent" | "not_sent" | "failed";
+  error?: string | null;
 }
 
 interface Campaign {
   _id: string;
   name: string;
   role: string;
+  subject: string;
   template: string;
   hrList: HR[];
+  status: "draft" | "sending" | "completed";
   createdAt: string;
 }
 
@@ -31,25 +35,27 @@ export default function CampaignDetails() {
   const [loading, setLoading] = useState(true);
   const [sending, setSending] = useState(false);
   const [saving, setSaving] = useState(false);
-  const [isEditing, setIsEditing] = useState(false); // 🔥 NEW
+  const [isEditing, setIsEditing] = useState(false);
 
+  /* ================= FETCH CAMPAIGN ================= */
   useEffect(() => {
     const fetchCampaign = async () => {
       try {
-        const res = await fetch(
-          `http://localhost:5000/api/campaigns/${id}`,
-          { credentials: "include" }
-        );
+        const res = await fetch(`http://localhost:5000/api/campaigns/${id}`, {
+          credentials: "include",
+        });
 
         const data = await res.json();
 
-        if (data.success) {
-          setCampaign(data.campaign);
-          setTemplate(data.campaign.template || "");
-        } else {
+        if (!data.success) {
           router.push("/dashboard");
+          return;
         }
-      } catch (error) {
+
+        setCampaign(data.campaign);
+        setSubject(data.campaign.subject || "");
+        setTemplate(data.campaign.template || "");
+      } catch {
         router.push("/dashboard");
       } finally {
         setLoading(false);
@@ -59,49 +65,98 @@ export default function CampaignDetails() {
     if (id) fetchCampaign();
   }, [id, router]);
 
-  const handleSaveTemplate = () => {
+  /* ================= SAVE TEMPLATE ================= */
+  const handleSaveTemplate = async () => {
     if (!campaign) return;
-    setSaving(true);
 
-    setTimeout(() => {
-      setCampaign({ ...campaign, template });
+    try {
+      setSaving(true);
+
+      const res = await fetch(
+        `http://localhost:5000/api/campaigns/${campaign._id}`,
+        {
+          method: "PUT",
+          credentials: "include",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            name: campaign.name,
+            role: campaign.role,
+            subject,
+            template,
+          }),
+        },
+      );
+
+      const data = await res.json();
+
+      if (!data.success) {
+        alert(data.message);
+        return;
+      }
+
+      // Refetch latest data from DB
+      const updatedRes = await fetch(
+        `http://localhost:5000/api/campaigns/${campaign._id}`,
+        { credentials: "include" },
+      );
+      const updatedData = await updatedRes.json();
+
+      if (updatedData.success) {
+        setCampaign(updatedData.campaign);
+        setSubject(updatedData.campaign.subject);
+        setTemplate(updatedData.campaign.template);
+      }
+
+      setIsEditing(false);
+      alert("Template updated successfully");
+    } catch {
+      alert("Something went wrong");
+    } finally {
       setSaving(false);
-      setIsEditing(false); // 🔥 Back to view mode
-      alert("Template updated");
-    }, 800);
+    }
   };
 
+  /* ================= START CAMPAIGN ================= */
+  const handleStartSending = async () => {
+    if (!campaign) return;
+
+    try {
+      setSending(true);
+
+      const res = await fetch(
+        `http://localhost:5000/api/campaigns/${campaign._id}/start`,
+        {
+          method: "POST",
+          credentials: "include",
+        },
+      );
+
+      const data = await res.json();
+
+      if (!data.success) {
+        alert(data.message);
+        return;
+      }
+
+      alert("Campaign started successfully");
+      window.location.reload();
+    } catch {
+      alert("Failed to start campaign");
+    } finally {
+      setSending(false);
+    }
+  };
+
+  /* ================= FILE HANDLING (FIXED) ================= */
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (!e.target.files) return;
-    const filesArray = Array.from(e.target.files);
-    setAttachments((prev) => [...prev, ...filesArray]);
+    const files = e.target.files;
+    if (!files) return;
+
+    setAttachments((prev) => [...prev, ...Array.from(files)]);
   };
 
   const removeAttachment = (index: number) => {
     setAttachments((prev) => prev.filter((_, i) => i !== index));
-  };
-
-  const handleStartSending = async () => {
-    if (!campaign) return;
-
-    setSending(true);
-    let updatedList = [...campaign.hrList];
-
-    for (let i = 0; i < updatedList.length; i++) {
-      await new Promise((resolve) => setTimeout(resolve, 700));
-
-      updatedList[i] = {
-        ...updatedList[i],
-        status: "sent",
-      };
-
-      setCampaign((prev) =>
-        prev ? { ...prev, hrList: [...updatedList] } : prev
-      );
-    }
-
-    setSending(false);
-    alert("All emails marked as sent (simulation)");
   };
 
   if (loading) {
@@ -134,17 +189,14 @@ export default function CampaignDetails() {
           Created on: {new Date(campaign.createdAt).toLocaleDateString()}
         </p>
 
-        {/* ================= EMAIL TEMPLATE ================= */}
         <div className="mb-8">
           <div className="flex justify-between items-center mb-3">
-            <h2 className="text-xl font-semibold">
-              Email Template
-            </h2>
+            <h2 className="text-xl font-semibold">Email Template</h2>
 
             {!isEditing ? (
               <button
                 onClick={() => setIsEditing(true)}
-                className="bg-blue-600 text-white px-4 py-1.5 rounded text-sm hover:bg-blue-700 transition"
+                className="bg-blue-600 text-white px-4 py-1.5 rounded text-sm"
               >
                 Edit
               </button>
@@ -152,44 +204,41 @@ export default function CampaignDetails() {
               <button
                 onClick={handleSaveTemplate}
                 disabled={saving}
-                className="bg-green-600 text-white px-4 py-1.5 rounded text-sm hover:bg-green-700 transition"
+                className="bg-green-600 text-white px-4 py-1.5 rounded text-sm"
               >
                 {saving ? "Saving..." : "Save"}
               </button>
             )}
           </div>
 
-          <div className="border rounded-xl overflow-hidden shadow-sm bg-white">
-
-            {/* Header */}
-            <div className="border-b px-4 py-3 bg-gray-50">
-              <div className="text-sm text-gray-600 mb-2">
+          <div className="border rounded-xl overflow-hidden bg-white">
+            <div className="border-b px-4 py-3 bg-gray-50 space-y-3">
+              <div className="text-sm text-gray-600">
                 To: All HRs ({campaign.hrList.length})
               </div>
 
-              <input
-                type="text"
-                placeholder="Subject"
-                value={subject}
-                disabled={!isEditing}
-                onChange={(e) => setSubject(e.target.value)}
-                className={`w-full bg-transparent outline-none text-base font-medium ${
-                  !isEditing ? "text-gray-500 cursor-not-allowed" : ""
-                }`}
-              />
+              <div className="flex items-center gap-2">
+                <span className="text-sm font-medium text-gray-700 whitespace-nowrap">
+                  Subject:
+                </span>
+                <input
+                  type="text"
+                  value={subject}
+                  disabled={!isEditing}
+                  onChange={(e) => setSubject(e.target.value)}
+                  className="flex-1 bg-transparent outline-none text-base font-medium border-b border-gray-300 focus:border-blue-500"
+                />
+              </div>
             </div>
 
-            {/* Body */}
             <div className="relative">
               <textarea
                 value={template}
                 disabled={!isEditing}
+                placeholder="enter your message here..."
                 onChange={(e) => setTemplate(e.target.value)}
-                placeholder="Write your email..."
                 rows={10}
-                className={`w-full p-4 outline-none resize-none ${
-                  !isEditing ? "bg-gray-50 text-gray-600 cursor-not-allowed" : ""
-                }`}
+                className="w-full p-4 outline-none resize-none"
               />
 
               {isEditing && (
@@ -197,8 +246,7 @@ export default function CampaignDetails() {
                   <button
                     type="button"
                     onClick={() => fileInputRef.current?.click()}
-                    className="text-gray-500 hover:text-black text-lg"
-                    title="Attach files"
+                    className="text-gray-500 text-lg"
                   >
                     📎
                   </button>
@@ -206,13 +254,9 @@ export default function CampaignDetails() {
               )}
             </div>
 
-            {/* Attachments Preview */}
             {attachments.length > 0 && (
               <div className="border-t bg-gray-50 p-4">
-                <p className="text-sm font-medium mb-2">
-                  Attachments:
-                </p>
-
+                <p className="text-sm font-medium mb-2">Attachments:</p>
                 <div className="flex flex-wrap gap-2">
                   {attachments.map((file, index) => (
                     <div
@@ -220,7 +264,6 @@ export default function CampaignDetails() {
                       className="flex items-center gap-2 bg-white border px-3 py-1 rounded text-sm"
                     >
                       <span>{file.name}</span>
-
                       {isEditing && (
                         <button
                           onClick={() => removeAttachment(index)}
@@ -245,55 +288,51 @@ export default function CampaignDetails() {
           />
         </div>
 
-        {/* Start Sending */}
+        {/* ================= START SENDING ================= */}
         <div className="mb-8">
           <button
             onClick={handleStartSending}
-            disabled={sending}
-            className="bg-blue-600 text-white px-6 py-2 rounded hover:bg-blue-700 transition"
+            disabled={sending || campaign.status !== "draft"}
+            className="bg-blue-600 text-white px-6 py-2 rounded"
           >
-            {sending ? "Sending..." : "Start Sending"}
+            {sending ? "Starting..." : "Start Sending"}
           </button>
         </div>
 
-        {/* HR List */}
+        {/* ================= HR LIST ================= */}
         <div>
           <h2 className="text-xl font-semibold mb-4">
             HR List ({campaign.hrList.length})
           </h2>
 
-          <div className="overflow-x-auto">
-            <table className="w-full border text-sm">
-              <thead className="bg-gray-200">
-                <tr>
-                  <th className="p-2 border">Name</th>
-                  <th className="p-2 border">Email</th>
-                  <th className="p-2 border">Company</th>
-                  <th className="p-2 border">Status</th>
+          <table className="w-full border text-sm">
+            <thead className="bg-gray-200">
+              <tr>
+                <th className="p-2 border">Name</th>
+                <th className="p-2 border">Email</th>
+                <th className="p-2 border">Company</th>
+                <th className="p-2 border">Status</th>
+              </tr>
+            </thead>
+            <tbody>
+              {campaign.hrList.map((hr, index) => (
+                <tr key={index}>
+                  <td className="p-2 border">{hr.name}</td>
+                  <td className="p-2 border">{hr.email}</td>
+                  <td className="p-2 border">{hr.company || "-"}</td>
+                  <td className="p-2 border">
+                    {hr.status === "sent" ? (
+                      <span className="text-green-600">Sent</span>
+                    ) : hr.status === "failed" ? (
+                      <span className="text-red-600">Failed</span>
+                    ) : (
+                      <span className="text-gray-500">Not Sent</span>
+                    )}
+                  </td>
                 </tr>
-              </thead>
-              <tbody>
-                {campaign.hrList.map((hr, index) => (
-                  <tr key={index} className="hover:bg-gray-50">
-                    <td className="p-2 border">{hr.name}</td>
-                    <td className="p-2 border">{hr.email}</td>
-                    <td className="p-2 border">{hr.company || "-"}</td>
-                    <td className="p-2 border">
-                      {hr.status === "sent" ? (
-                        <span className="text-green-600 font-medium">
-                          Sent
-                        </span>
-                      ) : (
-                        <span className="text-red-500 font-medium">
-                          Not Sent
-                        </span>
-                      )}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+              ))}
+            </tbody>
+          </table>
         </div>
       </div>
     </div>
