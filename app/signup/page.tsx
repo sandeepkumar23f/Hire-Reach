@@ -32,57 +32,52 @@ export default function SignUp() {
   };
 
   const handleSignUp = async () => {
-    setErrorMessage("");
-    setSuccessMessage("");
+  setErrorMessage("");
+  setSuccessMessage("");
 
-    if (!userData.name || !userData.email || !userData.password) {
-      setErrorMessage("All fields are required");
-      return;
+  if (!userData.name || !userData.email || !userData.password) {
+    setErrorMessage("All fields are required");
+    return;
+  }
+
+  if (!validateEmail(userData.email)) {
+    setErrorMessage("Enter valid email address");
+    return;
+  }
+
+  if (userData.password.length < 6) {
+    setErrorMessage("Password must be at least 6 characters");
+    return;
+  }
+
+  setLoading(true);
+
+  try {
+    const res = await fetch(`${API}/api/auth/signup`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      credentials: "include", // ✅ important for cookie
+      body: JSON.stringify(userData),
+    });
+
+    const result = await res.json();
+
+    if (res.ok && result.success) {
+      setSuccessMessage("Account created successfully");
+
+      setTimeout(() => {
+        router.push("/dashboard");
+      }, 1000);
+    } else {
+      setErrorMessage(result.message || "Signup failed");
     }
-
-    if (!validateEmail(userData.email)) {
-      setErrorMessage("Enter valid email address");
-      return;
-    }
-
-    if (userData.password.length < 6) {
-      setErrorMessage("Password must be at least 6 characters");
-      return;
-    }
-
-    setLoading(true);
-
-    try {
-      const res = await fetch(`${API}/api/auth/signup`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        credentials: "include",
-        body: JSON.stringify(userData),
-      });
-
-      const result = await res.json();
-
-      if (result.success) {
-        if (result.token) {
-          localStorage.setItem("token", result.token);
-        }
-
-        setSuccessMessage("Account created successfully");
-
-        setTimeout(() => {
-          router.push("/dashboard");
-        }, 1000);
-      } else {
-        setErrorMessage(result.message || "Signup failed");
-      }
-    } catch (error) {
-      console.error("Signup error:", error);
-      setErrorMessage("Server error. Please try again.");
-    } finally {
-      setLoading(false);
-    }
-  };
-
+  } catch (error) {
+    console.error("Signup error:", error);
+    setErrorMessage("Server error. Please try again.");
+  } finally {
+    setLoading(false);
+  }
+};
   return (
     <>
       <div className="fixed top-0 w-full h-16 flex items-center px-8 bg-white shadow-sm text-black font-bold text-2xl z-50">
