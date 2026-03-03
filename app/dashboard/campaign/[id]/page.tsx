@@ -37,7 +37,6 @@ export default function CampaignDetails() {
   const [saving, setSaving] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
 
-  /* ================= FETCH CAMPAIGN ================= */
   useEffect(() => {
     const fetchCampaign = async () => {
       try {
@@ -65,7 +64,24 @@ export default function CampaignDetails() {
     if (id) fetchCampaign();
   }, [id, router]);
 
-  /* ================= SAVE TEMPLATE ================= */
+  useEffect(() => {
+  if (!campaign || campaign.status !== "sending") return;
+
+  const interval = setInterval(async () => {
+    const res = await fetch(
+      `http://localhost:5000/api/campaigns/${campaign._id}`,
+      { credentials: "include" }
+    );
+    const data = await res.json();
+
+    if (data.success) {
+      setCampaign(data.campaign);
+    }
+  }, 3000);
+
+  return () => clearInterval(interval);
+}, [campaign?.status]);
+
   const handleSaveTemplate = async () => {
     if (!campaign) return;
 
@@ -116,7 +132,6 @@ export default function CampaignDetails() {
     }
   };
 
-  /* ================= START CAMPAIGN ================= */
   const handleStartSending = async () => {
     if (!campaign) return;
 
@@ -147,7 +162,6 @@ export default function CampaignDetails() {
     }
   };
 
-  /* ================= FILE HANDLING (FIXED) ================= */
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
     if (!files) return;
@@ -288,7 +302,6 @@ export default function CampaignDetails() {
           />
         </div>
 
-        {/* ================= START SENDING ================= */}
         <div className="mb-8">
           <button
             onClick={handleStartSending}
@@ -299,7 +312,8 @@ export default function CampaignDetails() {
           </button>
         </div>
 
-        {/* ================= HR LIST ================= */}
+
+            
         <div>
           <h2 className="text-xl font-semibold mb-4">
             HR List ({campaign.hrList.length})
