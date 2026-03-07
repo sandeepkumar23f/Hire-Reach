@@ -11,6 +11,7 @@ export default function SignUp() {
     name: "",
     email: "",
     password: "",
+    appPassword: "",
   });
 
   const [loading, setLoading] = useState(false);
@@ -32,52 +33,63 @@ export default function SignUp() {
   };
 
   const handleSignUp = async () => {
-  setErrorMessage("");
-  setSuccessMessage("");
+    setErrorMessage("");
+    setSuccessMessage("");
 
-  if (!userData.name || !userData.email || !userData.password) {
-    setErrorMessage("All fields are required");
-    return;
-  }
-
-  if (!validateEmail(userData.email)) {
-    setErrorMessage("Enter valid email address");
-    return;
-  }
-
-  if (userData.password.length < 6) {
-    setErrorMessage("Password must be at least 6 characters");
-    return;
-  }
-
-  setLoading(true);
-
-  try {
-    const res = await fetch(`${API}/api/auth/signup`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      credentials: "include", // ✅ important for cookie
-      body: JSON.stringify(userData),
-    });
-
-    const result = await res.json();
-
-    if (res.ok && result.success) {
-      setSuccessMessage("Account created successfully");
-
-      setTimeout(() => {
-        router.push("/dashboard");
-      }, 1000);
-    } else {
-      setErrorMessage(result.message || "Signup failed");
+    if (
+      !userData.name ||
+      !userData.email ||
+      !userData.password ||
+      !userData.appPassword
+    ) {
+      setErrorMessage("All fields are required");
+      return;
     }
-  } catch (error) {
-    console.error("Signup error:", error);
-    setErrorMessage("Server error. Please try again.");
-  } finally {
-    setLoading(false);
-  }
-};
+
+    if (!validateEmail(userData.email)) {
+      setErrorMessage("Enter valid email address");
+      return;
+    }
+
+    if (userData.password.length < 6) {
+      setErrorMessage("Password must be at least 6 characters");
+      return;
+    }
+
+    if (userData.appPassword.length < 16) {
+      setErrorMessage("Enter valid Gmail App Password");
+      return;
+    }
+
+    setLoading(true);
+
+    try {
+      const res = await fetch(`${API}/api/auth/signup`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify(userData),
+      });
+
+      const result = await res.json();
+
+      if (res.ok && result.success) {
+        setSuccessMessage("Account created successfully");
+
+        setTimeout(() => {
+          router.push("/dashboard");
+        }, 1000);
+      } else {
+        setErrorMessage(result.message || "Signup failed");
+      }
+    } catch (error) {
+      console.error("Signup error:", error);
+      setErrorMessage("Server error. Please try again.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
   return (
     <>
       <div className="fixed top-0 w-full h-16 flex items-center px-8 bg-white shadow-sm text-black font-bold text-2xl z-50">
@@ -132,6 +144,23 @@ export default function SignUp() {
               placeholder="Enter password"
               className="w-full h-10 border rounded-md px-3"
             />
+          </div>
+
+          {/* NEW FIELD */}
+
+          <div className="mb-4">
+            <label>Gmail App Password</label>
+            <input
+              name="appPassword"
+              value={userData.appPassword}
+              onChange={handleChange}
+              type="password"
+              placeholder="Enter 16-digit Gmail App Password"
+              className="w-full h-10 border rounded-md px-3"
+            />
+            <p className="text-xs text-gray-500 mt-1">
+              Generate this from Google → Security → App Passwords
+            </p>
           </div>
 
           <button
