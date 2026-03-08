@@ -21,14 +21,14 @@ export default function Dashboard() {
   const [campaigns, setCampaigns] = useState<Campaign[]>([]);
   const [loading, setLoading] = useState(true);
   const router = useRouter();
-
+  const API = process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:5000";
   useEffect(() => {
     fetchCampaigns();
   }, []);
 
   const fetchCampaigns = async () => {
     try {
-      const res = await fetch("http://localhost:5000/api/campaigns", {
+      const res = await fetch(`${API}/api/campaigns`, {
         credentials: "include",
       });
 

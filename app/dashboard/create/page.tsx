@@ -14,7 +14,7 @@ export default function CreateCampaign() {
 
   const [file, setFile] = useState<File | null>(null);
   const [loading, setLoading] = useState(false);
-
+  const API = process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:5000";
   const handleChange = (
     e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>
   ) => {
@@ -49,7 +49,7 @@ export default function CreateCampaign() {
       data.append("file", file);
 
       const res = await fetch(
-        "http://localhost:5000/api/campaigns/create",
+        `${API}/api/campaigns/create`,
         {
           method: "POST",
           credentials: "include",
